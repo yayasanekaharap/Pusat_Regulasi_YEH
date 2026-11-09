@@ -86,17 +86,33 @@ Langkah ini memastikan kunci publik di `config.js` tidak membuka apa pun.
 
 ### C. Edge Function dan rahasianya
 
-1. Siapkan dua nilai:
-   - **JWT Secret project:** Supabase › **Settings › API › JWT Settings › JWT Secret** (klik *Reveal*). Salin.
-   - **Rahasia kunci sesi:** karangan Anda sendiri, acak, 40–64 karakter, huruf dan angka. Nilai ini akan dipakai di **dua tempat** dan harus sama persis.
+Langkah ini memakai tiga nilai, dan asalnya **berbeda**. Dua sudah ada dan tinggal disalin; satu belum ada dan Anda yang membuatnya.
+
+| Nilai | Asalnya | Dipakai di |
+|---|---|---|
+| **JWT Secret project** | **Sudah ada.** Supabase › Settings › API › JWT Settings › JWT Secret, klik *Reveal* | langkah C.4, sebagai `REG_JWT_SECRET` |
+| **service_role key** | **Sudah ada.** Supabase › Settings › API › `service_role`, klik *Reveal* | langkah D.2, sebagai `REG_SB_SERVICE_KEY` |
+| **Rahasia kunci sesi** | **BELUM ADA. Anda yang membuatnya**, seperti membuat sandi baru | **dua tempat**: langkah C.4 sebagai `REG_TOKEN_SECRET` **dan** langkah D.2 sebagai `REG_TOKEN_SECRET` — harus **sama persis** |
+
+**Tentang rahasia kunci sesi.** Ini sandi bersama antara Apps Script dan Edge Function: Apps Script menandatangani kunci sesi dengan sandi itu, Edge Function memeriksa tanda tangannya dengan sandi yang sama. Tidak diambil dari mana pun, tidak perlu diingat, dan tidak dipakai untuk hal lain. Syaratnya hanya: acak, 40–64 karakter, huruf dan angka, dan nilainya identik di kedua tempat.
+
+Untuk membuatnya, jalankan satu perintah ini di PC lalu salin hasilnya:
+
+```
+node -e "const c=require('crypto');const a='abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';const b=c.randomBytes(56);let s='';for(let i=0;i<56;i++)s+=a[b[i]%a.length];console.log(s)"
+```
+
+Simpan hasilnya di tempat Anda biasa menyimpan sandi. Nilai itu **tidak** ditulis di sheet mana pun dan **tidak** masuk repo.
+
+1. Siapkan ketiga nilai di atas.
 2. Supabase › **Edge Functions › Create a new function**, nama fungsinya **`regulasi-sesi`** (persis, dengan tanda minus).
 3. Hapus isi contohnya, lalu tempel seluruh isi `supabase/functions/regulasi-sesi/index.ts` dari repo. **Deploy**.
 4. Supabase › **Edge Functions › Secrets › Add new secret**, tambahkan dua secret:
 
    | Nama secret | Nilai |
    |---|---|
-   | `REG_TOKEN_SECRET` | rahasia kunci sesi karangan Anda |
-   | `REG_JWT_SECRET` | JWT Secret project dari langkah C.1 |
+   | `REG_TOKEN_SECRET` | rahasia kunci sesi yang Anda buat di langkah C |
+   | `REG_JWT_SECRET` | JWT Secret project (Settings › API › JWT Settings) |
 
 5. **Hasil yang diharapkan:** fungsi berstatus **ACTIVE** dan kedua secret terdaftar.
 
@@ -109,10 +125,11 @@ Langkah ini memastikan kunci publik di `config.js` tidak membuka apa pun.
    |---|---|
    | `REG_SB_URL` | `https://dybnqztyxqazhmbywwge.supabase.co` |
    | `REG_SB_SERVICE_KEY` | **service_role** key, dari Supabase › Settings › API › `service_role`. Klik *Reveal* |
-   | `REG_TOKEN_SECRET` | **sama persis** dengan `REG_TOKEN_SECRET` di langkah C.4 |
+   | `REG_TOKEN_SECRET` | rahasia kunci sesi yang sama — **salin-tempel** dari tempat Anda menyimpannya, jangan diketik ulang |
 
 3. **Hasil yang diharapkan:** tiga properti tersimpan.
-4. `service_role` key tidak boleh ditulis di sheet mana pun dan tidak boleh masuk repo. Tempatnya hanya di sini.
+4. `service_role` key dan rahasia kunci sesi tidak boleh ditulis di sheet mana pun dan tidak boleh masuk repo.
+5. Bila `REG_TOKEN_SECRET` di sini berbeda walau satu karakter dari yang di langkah C.4, penukaran kunci ditolak dan web tetap berjalan memakai jalur Apps Script. Gejalanya terlihat di Diagnosa: baris **Tukar kunci sesi** merah dengan pesan *"Kunci sesi tidak sah"*.
 
 ### E. Terbitkan Apps Script
 
@@ -200,7 +217,10 @@ Kerjakan berurutan sesudah build Cloudflare selesai.
 16. Uji akses: minta satu pegawai berperan **Pengguna** membuka web. **Diharapkan:** regulasi *Anggaran Dasar YEH* dan *Anggaran Rumah Tangga YEH* **tidak** muncul dalam daftarnya.
 17. Alamat GitHub Pages yang lama sudah tidak melayani.
 
-Bila langkah 6 menunjukkan **Tukar kunci sesi** hijau tetapi **Baca cermin** merah: yang salah adalah `REG_JWT_SECRET` di langkah C.4 — tanda tangan kunci sesi sudah terbukti cocok, yang ditolak PostgREST adalah JWT-nya.
+Dua gejala yang mudah dikacaukan:
+
+- **Tukar kunci sesi** merah, pesan *"Kunci sesi tidak sah"* → `REG_TOKEN_SECRET` di langkah C.4 dan D.2 tidak sama.
+- **Tukar kunci sesi** hijau tetapi **Baca cermin** merah → yang salah `REG_JWT_SECRET` di langkah C.4. Tanda tangan kunci sesi sudah terbukti cocok; yang ditolak PostgREST adalah JWT-nya.
 
 Bila Diagnosa menyebut *"Cermin Supabase tidak aktif pada sesi ini"*: langkah D belum lengkap. Web tetap benar, hanya masih memakai jalur lama.
 
