@@ -2,6 +2,7 @@
 /* Pusat Referensi Regulasi YEH — antarmuka web (HTML + JavaScript biasa) v1.4.0 */
 (function () {
   const C = window.YEH_CONFIG, API = window.YehApi, Lib = window.YehStore.Lib, Prefs = window.YehStore.Prefs;
+  const Cermin = window.YehCermin;
   const $ = s => document.querySelector(s);
   const TOKEN_KEY = C.STORAGE_KEY + ':token';
   const S = {
@@ -9,7 +10,8 @@
     lib: new Map(), syncing: false, libFail: new Set(),
     docId: '', doc: null, ver: '', cmp: '', onlyDiff: false, render: null, observer: null,
     find: { q: '', marks: [], i: -1 }, tocFold: new Set(),
-    admin: null, activity: null, search: null, searchGroup: '', nav: 0, sideTab: 'regs'
+    admin: null, activity: null, search: null, searchGroup: '', nav: 0, sideTab: 'regs',
+    cermin: false, cerminReg: null
   };
 
   /* ================= Utilitas ================= */
@@ -69,6 +71,16 @@
 
   const norm = s => String(s == null ? '' : s).normalize('NFKC').toLocaleLowerCase('id').replace(/\s+/g, ' ').trim();
   const normSp = s => String(s || '').replace(/\s+/g, ' ').trim();
+  /* Backend tidak mengirim naskah dasar yang isinya persis sama dengan naskah
+     berlaku; yang dikirim hanya penandanya (row.sama). Dipulihkan di sini,
+     sehingga tampilan, pembanding, daftar isi, dan pencarian lokal bekerja
+     seperti sebelumnya tanpa perlu tahu soal penghematan itu. */
+  function tks(t, kunci, sama) {
+    const v = t[kunci];
+    if (v) return v;
+    if (sama && (kunci === 'dasar' || kunci === 'utuh')) return t.utuh || t.dasar || '';
+    return '';
+  }
   const pretty = id => String(id || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   const groupLabel = id => S.groupName[id] || pretty(id) || 'Tanpa kategori';
   const fmtBab = v => /^bab\b/i.test(v) ? v : 'BAB ' + v;
@@ -268,7 +280,8 @@
   async function resetSession(wipeLib) {
     setToken(''); closePop(); stopRender();
     if ($('#dlg').open) $('#dlg').close();
-    Object.assign(S, { user: null, regs: [], regMap: {}, marks: [], docId: '', doc: null, admin: null, activity: null, search: null });
+    Object.assign(S, { user: null, regs: [], regMap: {}, marks: [], docId: '', doc: null, admin: null, activity: null, search: null, cermin: false, cerminReg: null });
+    if (Cermin) Cermin.lupakan();
     S.lib.clear();
     document.body.classList.remove('reading');
     if (wipeLib) await Lib.wipe();
@@ -283,6 +296,11 @@
   /* ================= Masuk ke aplikasi & pustaka di perangkat ================= */
   function loadInit(init) {
     S.user = init.user; S.regs = init.regulations || []; S.groups = init.groups || []; S.libRev = init.libRev || '';
+    // Kunci sesi untuk cermin. Kosong berarti REG_TOKEN_SECRET belum disetel di
+    // Apps Script; web lalu berjalan sepenuhnya lewat /exec, seperti sebelumnya.
+    S.cermin = !!init.cermin && !!init.sbKey;
+    S.cerminReg = null;
+    if (Cermin) Cermin.setKey(init.sbKey || '');
     S.marks = init.bookmarks || [];
     S.regMap = {}; S.regs.forEach(r => { S.regMap[r.id] = r; });
     S.groupName = {}; S.groups.forEach(g => { S.groupName[g.id] = g.name; });
@@ -305,6 +323,25 @@
     route();
     syncLibrary();
   }
+  /** Penanda revisi versi cermin. Dibandingkan dengan penanda dari Apps Script
+   *  sebelum cermin dipakai — itulah yang membuat naskah basi tidak pernah
+   *  tampil hanya karena cermin belum menyusul suntingan terakhir. */
+  async function cerminMeta(force) {
+    if (!S.cermin || !Cermin || !Cermin.siap()) return null;
+    if (!force && S.cerminReg && Date.now() - S.cerminReg.t < 60000) return S.cerminReg.peta;
+    try {
+      const daftar = await Cermin.regulasi();
+      const peta = {};
+      (daftar || []).forEach(function (x) { peta[x.id_regulasi] = x; });
+      S.cerminReg = { t: Date.now(), peta: peta };
+      return peta;
+    } catch (e) { S.cerminReg = null; return null; }
+  }
+  function docDariCermin(id, m, rows) {
+    return { id: id, rev: m.rev, versions: m.versi_tersedia || [],
+      defaultVersion: m.versi_default || 'utuh', rows: rows };
+  }
+
   const libReady = () => S.regs.length > 0 && S.regs.every(r => { const d = S.lib.get(r.id); return d && d.rev === r.rev; });
   function updateLibStatus() {
     const el = $('#libStatus'); if (!el) return;
@@ -322,10 +359,34 @@
     try {
       for (const id of [...S.lib.keys()]) if (!S.regMap[id]) { S.lib.delete(id); await Lib.del(id); }
       let need = S.regs.filter(r => { const d = S.lib.get(r.id); return (!d || d.rev !== r.rev) && !S.libFail.has(r.id); }).map(r => r.id);
+
+      // Jalur baku: cermin Supabase, satu regulasi satu permintaan. Yang
+      // penanda revisinya belum sama dengan Apps Script dilewati ke jalur
+      // cadangan, bukan diambil setengah benar.
+      const peta = await cerminMeta(true);
+      if (peta && need.length) {
+        const sisa = [];
+        for (const id of need) {
+          if (!S.user || S.user.id !== uid) return;
+          const reg = S.regMap[id], m = peta[id];
+          if (!reg || !m || m.rev !== reg.rev) { sisa.push(id); continue; }
+          try {
+            const n = await Cermin.naskah(id);
+            if (!n.rows.length || (n.rev && n.rev !== reg.rev)) { sisa.push(id); continue; }
+            const doc = docDariCermin(id, m, n.rows);
+            S.lib.set(id, doc); await Lib.put(doc);
+            Cermin.ukur.sumber = 'cermin';
+            updateLibStatus();
+          } catch (e) { sisa.push(id); }
+        }
+        need = sisa;
+      }
+
       while (need.length && S.user && S.user.id === uid) {
         const batch = need.splice(0, 4);
         let res;
         try { res = await req('docs', { ids: batch }, { timeout: 180000 }); } catch (e) { break; }
+        if (Cermin) Cermin.ukur.sumber = 'Apps Script';
         for (const [id, d] of Object.entries(res.docs || {})) {
           if (d.error) { S.libFail.add(id); continue; }
           const doc = { id, rev: d.rev, versions: d.versions, defaultVersion: d.defaultVersion, rows: d.rows };
@@ -340,10 +401,26 @@
     const reg = S.regMap[id];
     const local = S.lib.get(id);
     if (!force && local && reg && local.rev === reg.rev) return local;
+    if (reg) {
+      const peta = await cerminMeta(force);
+      const m = peta && peta[id];
+      if (m && m.rev === reg.rev) {
+        try {
+          const n = await Cermin.naskah(id);
+          if (n.rows.length && (!n.rev || n.rev === reg.rev)) {
+            const doc = docDariCermin(id, m, n.rows);
+            S.lib.set(id, doc); Lib.put(doc); updateLibStatus();
+            Cermin.ukur.sumber = 'cermin';
+            return doc;
+          }
+        } catch (e) { /* lanjut ke jalur cadangan di bawah */ }
+      }
+    }
     try {
       const d = await req('document', { id });
       const doc = { id, rev: d.rev, versions: d.versions, defaultVersion: d.defaultVersion, rows: d.rows };
       S.lib.set(id, doc); Lib.put(doc); updateLibStatus();
+      if (Cermin) Cermin.ukur.sumber = 'Apps Script';
       return doc;
     } catch (e) {
       if (local && e.network) { toast('Server tidak terjangkau. Menampilkan salinan tersimpan.', 'error'); return local; }
@@ -410,6 +487,7 @@
       S.user.role === 'ADMIN' ? { icon: 'settings', label: 'Panel Admin', onClick: () => { location.hash = '#/admin'; } } : null,
       { icon: 'key', label: 'Ganti sandi', onClick: () => showChange(false) },
       { icon: 'refresh', label: 'Muat ulang data', onClick: () => refreshAll(true) },
+      { icon: 'activity', label: 'Diagnosa', onClick: () => { location.hash = '#/diagnosa'; } },
       '-',
       { icon: 'logout', label: 'Keluar', danger: true, onClick: logout },
       { foot: 'Versi web ' + C.APP_VERSION + ' · data dihapus dari perangkat saat Keluar' }
@@ -498,6 +576,7 @@
     if (parts[0] === 'kategori' && parts[1]) return { name: 'cat', id: decodeURIComponent(parts[1]) };
     if (parts[0] === 'penanda') return { name: 'marks' };
     if (parts[0] === 'admin') return { name: 'admin', tab: parts[1] || 'users' };
+    if (parts[0] === 'diagnosa') return { name: 'diag' };
     return { name: 'home' };
   }
   async function route() {
@@ -511,6 +590,7 @@
     if (r.name === 'doc') await openDoc(r.id, r.row, nav);
     else if (r.name === 'search') await runSearch(r.q, nav);
     else if (r.name === 'admin') await showAdmin(r.tab, nav);
+    else if (r.name === 'diag') await showDiagnosa(nav);
     else if (r.name === 'cat') { renderCategory(r.id); window.scrollTo(0, 0); }
     else if (r.name === 'marks') { renderMarks(); window.scrollTo(0, 0); }
     else { renderHome(); window.scrollTo(0, 0); }
@@ -717,7 +797,7 @@
     let pend = [], curB = null;
     const head = it => { if (only) pend.push(it); else items.push(it); };
     for (const r of d.rows) {
-      const t = r.t || {}, txt = t[v] || '', ct = c ? (t[c] || '') : '';
+      const t = r.t || {}, txt = tks(t, v, r.sama), ct = c ? tks(t, c, r.sama) : '';
       if (r.bab && r.bab !== cur.bab) {
         cur.bab = r.bab; cur.pasal = '';
         const titleRow = !r.pasal && !r.ayat && !r.poin && !r.subpoin;
@@ -1008,9 +1088,23 @@
     if (!S.search || S.search.key !== key) {
       if (libReady()) S.search = { key, q, res: localSearch(q, S.searchGroup) };
       else {
-        loading('Mencari "' + q + '" di server… Pustaka di perangkat belum lengkap, jadi pencarian bisa memakan waktu.');
-        try { const res = await req('search', { query: q, group: S.searchGroup }); S.search = { key, q, res }; }
-        catch (e) { if (nav === S.nav) failed(e.message, () => { S.search = null; runSearch(q, ++S.nav); }); return; }
+        const pakaiCermin = S.cermin && Cermin && Cermin.siap();
+        loading(pakaiCermin
+          ? 'Mencari "' + q + '" …'
+          : 'Mencari "' + q + '" di server… Pustaka di perangkat belum lengkap, jadi pencarian bisa memakan waktu.');
+        let res = null;
+        if (pakaiCermin) {
+          try {
+            const hasil = await Cermin.cari(q, S.searchGroup, 120);
+            res = { results: hasil, truncated: hasil.length >= 120, skipped: [] };
+            Cermin.ukur.sumber = 'cermin';
+          } catch (e) { res = null; }
+        }
+        if (!res) {
+          try { res = await req('search', { query: q, group: S.searchGroup }); if (Cermin) Cermin.ukur.sumber = 'Apps Script'; }
+          catch (e) { if (nav === S.nav) failed(e.message, () => { S.search = null; runSearch(q, ++S.nav); }); return; }
+        }
+        S.search = { key, q, res };
         if (nav !== S.nav) return;
       }
     }
@@ -1345,6 +1439,130 @@
     load(false);
     return h('div', null, h('div', { class: 'bar' }, uSel, kSel, h('span', { class: 'spacer' }),
       h('button', { class: 'btn', type: 'button', onclick: () => load(true) }, icon('refresh'), 'Muat ulang')), box);
+  }
+
+  /* ================= Diagnosa ================= */
+
+  /** Membandingkan versi secara bertingkat. Hijau bila versi backend SAMA ATAU
+   *  LEBIH BARU daripada yang diminta web — bukan harus sama persis, karena
+   *  sebagian paket hanya menyentuh web dan tidak butuh deployment baru. */
+  function versiCukup(ada, min) {
+    const a = String(ada || '').split('.').map(Number), b = String(min || '').split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+      const x = a[i] || 0, y = b[i] || 0;
+      if (x !== y) return x > y;
+    }
+    return true;
+  }
+  function chipMs(ms, baik, batas) {
+    if (ms == null) return h('span', { class: 'chip off', text: '—' });
+    return h('span', { class: 'chip ' + (ms <= baik ? 'ok' : ms <= batas ? 'warn' : 'danger'), text: ms + ' ms' });
+  }
+  function chipYa(ya, labelYa, labelTidak) {
+    return h('span', { class: 'chip ' + (ya ? 'ok' : 'danger'), text: ya ? (labelYa || 'Ya') : (labelTidak || 'Tidak') });
+  }
+
+  async function showDiagnosa(nav) {
+    loading('Mengukur…');
+    const u = {};
+    const t0 = performance.now();
+    try {
+      const p = await API.call('ping', {}, { timeout: 30000 });
+      u.execMs = Math.round(performance.now() - t0);
+      u.versiKode = (p && p.versiKode) || '';
+      u.fitur = (p && p.fitur) || null;
+    } catch (e) {
+      u.execMs = Math.round(performance.now() - t0);
+      u.execGalat = e.message;
+    }
+    if (S.cermin && Cermin && Cermin.siap()) {
+      const t1 = performance.now();
+      try { await Cermin.ambilJwt(); u.tukarMs = Math.round(performance.now() - t1); }
+      catch (e) { u.tukarGalat = e.message; }
+      if (!u.tukarGalat) {
+        const t2 = performance.now();
+        try {
+          const daftar = await Cermin.regulasi();
+          u.bacaMs = Math.round(performance.now() - t2);
+          u.bacaBaris = (daftar || []).length;
+        } catch (e) { u.bacaGalat = e.message; }
+        try { u.meta = await Cermin.meta(); } catch (e) { u.metaGalat = e.message; }
+      }
+    } else u.cerminMati = true;
+    if (nav !== S.nav) return;
+    renderDiagnosa(u);
+    window.scrollTo(0, 0);
+  }
+
+  function renderDiagnosa(u) {
+    const min = C.VERSI_BACKEND_MIN || '';
+    const jum = (u.tukarMs != null && u.bacaMs != null) ? u.tukarMs + u.bacaMs : null;
+    const F = u.fitur || {};
+    const namaFitur = [
+      ['revPerSheet', 'Penanda revisi per sheet'],
+      ['naskahTunggal', 'Naskah kembar tidak dikirim dua kali'],
+      ['cerminKode', 'Kode cermin Supabase terbit'],
+      ['cerminDisetel', 'Cermin Supabase disetel (Script Properties)'],
+      ['kunciSesiKode', 'Kode kunci sesi terbit'],
+      ['kunciSesiDisetel', 'Rahasia kunci sesi disetel']
+    ];
+    const baris = [
+      ['Versi web', h('b', { text: C.APP_VERSION }), h('span', { class: 'chip off', text: '—' })],
+      ['Versi kode backend',
+        h('b', { text: u.versiKode || (u.execGalat ? 'tidak terjawab' : '—') }),
+        u.versiKode ? chipYa(versiCukup(u.versiKode, min), 'minimal ' + min + ' terpenuhi', 'di bawah ' + min)
+                    : h('span', { class: 'chip danger', text: 'tidak terbaca' })],
+      ['Tukar kunci sesi',
+        h('span', { text: u.tukarGalat ? u.tukarGalat : (u.cerminMati ? 'cermin tidak aktif' : '') }),
+        u.tukarGalat ? h('span', { class: 'chip danger', text: 'gagal' }) : chipMs(u.tukarMs, 400, 800)],
+      ['Baca cermin',
+        h('span', { text: u.bacaGalat ? u.bacaGalat : (u.bacaBaris != null ? u.bacaBaris + ' regulasi terbaca' : '') }),
+        u.bacaGalat ? h('span', { class: 'chip danger', text: 'gagal' }) : chipMs(u.bacaMs, 600, 1000)],
+      ['Jumlah tukar + baca', h('span', { text: '' }), chipMs(jum, 1000, 1500)],
+      ['Baca naskah terakhir',
+        h('span', { text: (Cermin && Cermin.ukur.baris) ? Cermin.ukur.baris + ' baris' : 'belum ada naskah dibuka' }),
+        (Cermin && Cermin.ukur.bacaMs) ? chipMs(Cermin.ukur.bacaMs, 600, 1000) : h('span', { class: 'chip off', text: '—' })],
+      ['Sumber data terakhir',
+        h('b', { text: (Cermin && Cermin.ukur.sumber) || 'belum ada' }),
+        h('span', { class: 'chip ' + (Cermin && Cermin.ukur.sumber === 'cermin' ? 'ok' : 'warn'),
+          text: Cermin && Cermin.ukur.sumber === 'cermin' ? 'jalur baku' : 'jalur cadangan' })],
+      ['Respons Apps Script (jalur cadangan)',
+        h('span', { text: u.execGalat || '' }),
+        u.execGalat ? h('span', { class: 'chip danger', text: 'gagal' }) : chipMs(u.execMs, 1800, 3000)],
+      ['Pemicu sumber Supabase',
+        h('span', { text: 'pemicu suntingan di spreadsheet sumber' }),
+        u.meta ? chipYa(String(u.meta.pemicu_sumber).toUpperCase() === 'YA', 'terpasang', 'belum terpasang')
+               : h('span', { class: 'chip off', text: '—' })],
+      ['Rekonsiliasi cermin terakhir',
+        h('span', { text: (u.meta && u.meta.cermin_terakhir) ? ago(u.meta.cermin_terakhir) : 'belum pernah' }),
+        u.meta ? chipYa(!!(u.meta.cermin_terakhir), 'ada', 'belum pernah') : h('span', { class: 'chip off', text: '—' })],
+      ['Keep-alive terakhir',
+        h('span', { text: (u.meta && u.meta.keep_alive_terakhir) ? ago(u.meta.keep_alive_terakhir) : 'belum pernah' }),
+        u.meta ? chipYa(!!(u.meta.keep_alive_terakhir), 'ada', 'belum pernah') : h('span', { class: 'chip off', text: '—' })]
+    ];
+    const tabelUkur = table([
+      { label: 'Baris', render: r => h('b', { text: r[0] }) },
+      { label: 'Keterangan', render: r => r[1] },
+      { label: 'Status', render: r => r[2] }
+    ], baris, 'Tidak ada data pengukuran.');
+
+    const tabelFitur = table([
+      { label: 'Kemampuan backend', render: r => h('span', { text: r[1] }) },
+      { label: 'Status', render: r => u.fitur ? chipYa(!!F[r[0]], 'ada', 'tidak ada')
+        : h('span', { class: 'chip off', text: 'tidak terbaca' }) }
+    ], namaFitur, 'Backend tidak menjawab.');
+
+    content().replaceChildren(h('section', { class: 'page' },
+      pageHead('Diagnosa', 'Angka versi saja tidak membuktikan apa pun. Baris Kemampuan backend memeriksa kode yang benar-benar terbit.',
+        h('button', { class: 'btn', type: 'button', onclick: () => showDiagnosa(++S.nav) }, icon('refresh'), 'Ukur ulang')),
+      tabelUkur,
+      h('div', { class: 'panel' },
+        // Penjelasan lantai platform SELALU ditampilkan: baris jalur cadangan
+        // ada di kedua keadaan, dan justru ketika cermin mati penjelasan itu
+        // paling dibutuhkan.
+        u.cerminMati ? h('p', { class: 'muted', text: 'Cermin Supabase tidak aktif pada sesi ini. Web membaca sepenuhnya lewat Apps Script, dan itu tetap benar — hanya lebih lambat. Isi REG_SB_URL, REG_SB_SERVICE_KEY, dan REG_TOKEN_SECRET pada Script Properties untuk mengaktifkannya.' }) : null,
+        h('p', { class: 'muted', text: 'Satu permintaan ke Apps Script selalu menjadi dua perjalanan jaringan karena jawabannya berupa pengalihan 302. Ditambah waktu bangun runtime, 800–1.500 ms pada baris jalur cadangan adalah lantai platform, bukan cacat aplikasi.' })),
+      tabelFitur));
   }
 
   /* ================= Mulai ================= */

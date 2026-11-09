@@ -1,0 +1,15 @@
+{
+  // Penerbitan: Cloudflare Workers (bukan Pages, bukan GitHub Pages).
+  // Nama Worker harus sama persis dengan yang ada di akun Cloudflare, kalau
+  // tidak Cloudflare membuat Worker baru dan alamat lama tidak ikut pindah.
+  "name": "pusatregulasi",
+  "compatibility_date": "2026-11-09",
+  "observability": { "enabled": true },
+  // Situs ini hanya berkas statis: tanpa "main", tanpa binding.
+  // not_found_handling single-page-application diperlukan karena navigasinya
+  // memakai hash dan seluruh rute dilayani index.html.
+  "assets": {
+    "directory": "./build",
+    "not_found_handling": "single-page-application"
+  }
+}

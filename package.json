@@ -1,0 +1,13 @@
+{
+  "name": "pusat-regulasi-yeh",
+  "version": "1.5.0",
+  "private": true,
+  "description": "Pusat Referensi Regulasi Yayasan Eka Harap — web statis, diterbitkan ke Cloudflare Workers.",
+  "scripts": {
+    "build": "node build.mjs",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "eslint": "^9.39.0"
+  }
+}
