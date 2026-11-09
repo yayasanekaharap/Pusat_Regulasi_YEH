@@ -8,88 +8,9 @@
 <meta name="theme-color" content="#002855">
 <title>Pusat Referensi Regulasi · YEH</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
-<link rel="stylesheet" href="style.css?v=1.5.0">
 </head>
 <body>
-
-<div id="viewBoot" class="boot"><img src="assets/logo.png" alt=""><span class="spinner"></span></div>
-
-<main id="viewLogin" class="auth" hidden>
-  <div class="auth-card">
-    <img class="auth-logo" src="assets/logo.png" alt="Logo Yayasan Eka Harap">
-    <h1>Pusat Referensi Regulasi</h1>
-    <p class="muted">Yayasan Eka Harap · khusus pegawai terdaftar</p>
-    <form id="loginForm" novalidate>
-      <label class="field"><span>User ID</span>
-        <input name="userId" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
-      <label class="field"><span>Sandi</span>
-        <span class="pw"><input name="password" type="password" autocomplete="current-password" required><button type="button" class="pw-toggle">Lihat</button></span></label>
-      <p class="form-msg" id="loginMsg" role="alert"></p>
-      <button class="btn primary block" type="submit">Masuk</button>
-    </form>
-    <p class="hint">Lupa sandi? Hubungi admin untuk diatur ulang.</p>
-  </div>
-</main>
-
-<main id="viewChange" class="auth" hidden>
-  <div class="auth-card" id="changeCard"></div>
-</main>
-
-<div id="viewApp" hidden>
-  <header class="topbar" id="topbar">
-    <button class="icon-btn hide-wide" id="btnDrawer" type="button" aria-label="Buka panel" data-icon="menu"></button>
-    <div class="navbtns">
-      <button class="icon-btn" id="btnBack" type="button" aria-label="Kembali" title="Kembali" data-icon="arrowLeft" disabled></button>
-      <button class="icon-btn" id="btnFwd" type="button" aria-label="Maju" title="Maju" data-icon="arrowRight" disabled></button>
-    </div>
-    <a class="brand" href="#/"><img src="assets/logo.png" alt=""><span><strong>Pusat Referensi Regulasi</strong><small>Yayasan Eka Harap</small></span></a>
-    <form class="topsearch" id="searchForm" role="search">
-      <span class="ts-icon" data-icon="search"></span>
-      <input id="searchInput" type="search" placeholder="Cari isi pasal di semua regulasi…" aria-label="Cari isi pasal" enterkeyhint="search" autocomplete="off">
-      <button class="btn accent" type="submit">Cari</button>
-    </form>
-    <button class="icon-btn only-phone" id="btnSearchToggle" type="button" aria-label="Cari" data-icon="search"></button>
-    <button class="user-btn" id="btnUser" type="button" aria-haspopup="menu">
-      <span class="avatar" id="avatar"></span><span class="user-name" id="userName"></span><span class="chev" data-icon="chevDown"></span>
-    </button>
-  </header>
-
-  <div class="shell" id="shell">
-    <aside class="sidebar" id="sidebar" aria-label="Panel samping">
-      <nav class="side-nav">
-        <a href="#/" data-nav="home" title="Beranda"><span class="ic" data-icon="home"></span><span class="lb">Beranda</span></a>
-        <a href="#/penanda" data-nav="marks" title="Penanda saya"><span class="ic" data-icon="star"></span><span class="lb">Penanda saya</span><b class="count" id="markCount"></b></a>
-        <a href="#/admin" data-nav="admin" id="navAdmin" title="Panel Admin" hidden><span class="ic" data-icon="settings"></span><span class="lb">Panel Admin</span></a>
-      </nav>
-      <div class="side-tabs" role="tablist">
-        <button type="button" role="tab" data-tab="regs" title="Daftar regulasi"><span class="ic" data-icon="book"></span><span class="lb">Regulasi</span></button>
-        <button type="button" role="tab" data-tab="toc" title="Daftar isi naskah"><span class="ic" data-icon="list"></span><span class="lb">Daftar isi</span></button>
-      </div>
-      <div class="side-pane" id="paneRegs">
-        <div class="pane-tools">
-          <input id="filterInput" type="search" placeholder="Saring judul…" aria-label="Saring judul regulasi">
-          <button class="icon-btn sm" id="btnFoldAll" type="button" title="Lipat / buka semua kategori" data-icon="fold"></button>
-        </div>
-        <nav id="regList" class="reglist"></nav>
-      </div>
-      <div class="side-pane" id="paneToc" hidden></div>
-      <div class="side-foot">
-        <span class="lib-status" id="libStatus"></span>
-        <button class="icon-btn sm hide-narrow" id="btnCollapse" type="button" title="Perkecil panel" aria-label="Perkecil panel" data-icon="chevLeft"></button>
-      </div>
-    </aside>
-    <div class="scrim" id="scrim" hidden></div>
-    <main class="content" id="content"></main>
-  </div>
-</div>
-
-<dialog id="dlg" class="dlg"></dialog>
-<div id="toast" class="toast" role="status" hidden></div>
-
-<script src="config.js?v=1.5.0"></script>
-<script src="api.js?v=1.5.0"></script>
-<script src="store.js?v=1.5.0"></script>
-<script src="cermin.js?v=1.5.0"></script>
-<script src="app.js?v=1.5.0"></script>
+<div id="akar"></div>
+<script type="module" src="/src/index.jsx"></script>
 </body>
 </html>

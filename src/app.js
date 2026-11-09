@@ -1,8 +1,20 @@
+import C from './config.js';
+import API from './api.js';
+import { Lib, Prefs } from './store.js';
+import Cermin from './cermin.js';
 "use strict";
-/* Pusat Referensi Regulasi YEH — antarmuka web (HTML + JavaScript biasa) v1.4.0 */
-(function () {
-  const C = window.YEH_CONFIG, API = window.YehApi, Lib = window.YehStore.Lib, Prefs = window.YehStore.Prefs;
-  const Cermin = window.YehCermin;
+/*
+ * Perender halaman dalam aplikasi — isi #content, daftar regulasi, daftar isi,
+ * dialog, dan toast.
+ *
+ * Tahap v1.6.0-a SENGAJA tidak memindahkan logika apa pun dari berkas ini ke
+ * komponen React. Yang dikerjakan tahap ini hanya sistem build dan modul:
+ * kerangka halaman dirender React satu kali, lalu init() di bawah berjalan dan
+ * memakai elemen itu lewat id yang sama seperti sebelumnya. Dengan begitu
+ * perilakunya identik dan harness 74 pemeriksaan tetap menjadi buktinya.
+ * Tahap b dan c menggantinya halaman demi halaman.
+ */
+export function init() {
   const $ = s => document.querySelector(s);
   const TOKEN_KEY = C.STORAGE_KEY + ':token';
   const S = {
@@ -1582,4 +1594,4 @@
     }
   }
   boot();
-})();
+}

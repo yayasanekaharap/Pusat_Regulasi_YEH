@@ -1,7 +1,7 @@
+import C from './config.js';
 "use strict";
 /* Pemanggil Apps Script: POST teks JSON (tanpa preflight CORS), batas waktu, satu kali ulang untuk galat jaringan pada permintaan baca. */
-(function () {
-  const C = window.YEH_CONFIG;
+const YehApi = (function () {
   const READ = new Set(['ping', 'init', 'document', 'docs', 'search', 'adminData', 'adminActivity']);
 
   class ApiError extends Error {
@@ -43,5 +43,7 @@
   }
 
   const api = { call: call, token: '', ApiError: ApiError };
-  window.YehApi = api;
+  return api;
 })();
+
+export default YehApi;

@@ -1,3 +1,4 @@
+import C from './config.js';
 "use strict";
 /* Cermin baca Supabase.
  *
@@ -14,8 +15,7 @@
  * peran anon sudah dicabut dari seluruh tabel reg_*, sehingga tanpa JWT hasil
  * penukaran, kunci itu tidak membuka satu baris pun.
  */
-(function () {
-  const C = window.YEH_CONFIG;
+const YehCermin = (function () {
   const HAL = 1000;              // besar satu halaman baris naskah
   const AMBANG_SEGAR_MS = 60000; // JWT ditukar ulang 1 menit sebelum habis
 
@@ -142,6 +142,8 @@
     });
   }
 
-  window.YehCermin = { siap: siap, setKey: setKey, lupakan: lupakan,
+  return { siap: siap, setKey: setKey, lupakan: lupakan,
     ambilJwt: ambilJwt, regulasi: regulasi, naskah: naskah, cari: cari, meta: meta, ukur: ukur };
 })();
+
+export default YehCermin;

@@ -1,9 +1,9 @@
+import C from './config.js';
 "use strict";
 /* Penyimpanan di perangkat:
    - Lib   : salinan naskah (IndexedDB), dihapus saat Keluar.
    - Prefs : preferensi tampilan per perangkat (localStorage). */
-(function () {
-  const C = window.YEH_CONFIG;
+const YehStore = (function () {
   const DB = C.STORAGE_KEY + '_pustaka';
   let dbp = null;
 
@@ -56,5 +56,9 @@
     set(k, v) { try { localStorage.setItem(C.STORAGE_KEY + ':' + k, JSON.stringify(v)); } catch (_) {} }
   };
 
-  window.YehStore = { Lib, Prefs };
+  return { Lib: Lib, Prefs: Prefs };
 })();
+
+export const Lib = YehStore.Lib;
+export const Prefs = YehStore.Prefs;
+export default YehStore;

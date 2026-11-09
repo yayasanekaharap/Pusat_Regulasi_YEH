@@ -1,0 +1,15 @@
+# Dibiarkan tanpa aturan dengan sengaja.
+#
+# rootDir pada .clasp.json sudah menunjuk folder gas/, sehingga clasp hanya
+# melihat berkas di dalamnya. Menambahkan pola di sini berisiko: pada sebagian
+# versi clasp pola .claspignore dihitung relatif terhadap akar proyek, pada
+# sebagian lain relatif terhadap rootDir. Pola allowlist seperti
+#     **/**
+#     !gas/**
+# karena itu dapat berarti "abaikan segalanya" — dan clasp push yang tidak
+# mengirim apa pun akan MENGHAPUS seluruh berkas di proyek Apps Script.
+# Berkas tanpa aturan aman pada kedua tafsir: tidak ada yang diabaikan, dan
+# yang terkirim hanya isi rootDir.
+#
+# Pemeriksaan wajib pada clasp push pertama: daftar yang terkirim harus 14
+# berkas gas/ dan tidak boleh memuat index.html atau apa pun dari src/.
