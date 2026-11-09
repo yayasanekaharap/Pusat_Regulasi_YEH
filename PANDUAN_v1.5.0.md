@@ -52,6 +52,7 @@ Sudah di-commit dan di-push ke `main`.
 | `eslint.config.mjs` | **baru** | ESLint 9, `no-undef` dan `no-unused-vars` menyala |
 | `.gitignore` | **baru** | `node_modules/`, `build/` |
 | `supabase/01_reg_cermin.sql` | **baru** | Skema cermin, RLS, pencarian |
+| `supabase/02_reg_cari_public.sql` | **baru** | Memindahkan fungsi pencarian ke schema `public`, satu-satunya schema yang disajikan PostgREST |
 | `supabase/functions/regulasi-sesi/index.ts` | **baru** | Edge Function penukar kunci |
 | `app.js` | diubah | Jalur baca cermin + jatuh balik, pemulih naskah kembar, panel Diagnosa |
 | `config.js` | diubah | `APP_VERSION` 1.5.0, `VERSI_BACKEND_MIN`, `SUPABASE_URL`, `SUPABASE_KEY`. **`API_URL` tidak disentuh** |
@@ -68,7 +69,10 @@ Sudah di-commit dan di-push ke `main`.
 1. Buka **Supabase › project `yayasanekaharap's Project` › SQL Editor › New query**.
 2. Buka berkas `supabase/01_reg_cermin.sql` dari repo, salin **seluruh** isinya, tempel, lalu **Run**.
 3. **Hasil yang diharapkan:** `Success. No rows returned`. Beberapa baris `NOTICE ... skipping` wajar dan bukan galat.
-4. Berkas ini aman dijalankan ulang bila perlu.
+4. Ulangi untuk `supabase/02_reg_cari_public.sql`. Berkas kedua ini memindahkan fungsi pencarian ke schema `public` — tanpanya, pencarian lewat cermin dijawab `404 PGRST202` karena PostgREST hanya menyajikan `public`.
+5. Kedua berkas aman dijalankan ulang bila perlu.
+
+> Pada pemasangan 9 November 2026 kedua berkas ini **sudah diterapkan**. Langkah A hanya perlu dikerjakan lagi bila project Supabase dibangun ulang dari nol.
 
 ### B. Uji RLS — jangan dilewati
 
@@ -244,6 +248,8 @@ Bila Diagnosa menyebut *"Cermin Supabase tidak aktif pada sesi ini"*: langkah D 
 | `npm ci` dari nol lalu `npm run build` | lolos, 8 berkas, 228 KB, tanpa berkas lain yang ikut terbit |
 | Tampilan dengan Playwright pada 1366×768, 1536×864, 1920×1080: jatuh balik saat cermin mati, naskah kembar, pembanding, Diagnosa, gulir mendatar, galat konsol | 33 pemeriksaan lolos |
 | Tampilan jalur cermin: naskah dari cermin, `/exec` tidak dipanggil, pencarian lewat RPC, **dan penanda revisi cermin yang belum sama memaksa jalur cadangan** | 16 pemeriksaan lolos |
+| Uji RLS pada project sungguhan dari peramban: kunci `anon` dan kunci publishable terhadap keempat tabel | keduanya ditolak `401 / 42501`, nol baris terbaca |
+| Edge Function `regulasi-sesi` pada project sungguhan: GET, POST tanpa token, token ngawur, bentuk salah | `405` dan tiga `401` sesuai, 78–142 ms |
 
 **Cacat yang ditemukan pengujian sendiri, dan sudah diperbaiki:**
 
@@ -251,6 +257,8 @@ Bila Diagnosa menyebut *"Cermin Supabase tidak aktif pada sesi ini"*: langkah D 
 2. Indeks trigram pada `teks_cari` ternyata tidak pernah dipilih planner pada ukuran tabel ini (6,6 ms tanpa indeks, 1,5 ms bila dipaksa — keduanya jauh di bawah ambang 600 ms). Indeksnya dibuang; alasan dan cara menghidupkannya kembali dalam satu baris dicatat di dalam berkas SQL.
 3. Panel Diagnosa hanya menjelaskan "800–1.500 ms adalah lantai platform" ketika cermin aktif, padahal penjelasan itu paling dibutuhkan justru saat cermin mati. Sekarang selalu ditampilkan.
 4. Rujukan ke fungsi `yehForgetSrc_` yang tidak pernah ada, tertangkap lint sebelum di-push.
+5. **Fungsi pencarian berada di schema `reg`, sementara PostgREST hanya menyajikan `public`** — sehingga `rpc/cari_isi` dijawab `404 PGRST202` dan pencarian lewat cermin tidak akan pernah berjalan. Tidak tertangkap uji tampilan karena RPC-nya ditirukan di sana; baru terlihat ketika endpoint sungguhan dipanggil dari peramban. Diperbaiki dengan berkas SQL 02 dan `cermin.js` kini memanggil `rpc/reg_cari_isi`.
+6. Pada perbaikan nomor 5, `create function` ternyata memberi EXECUTE kepada **PUBLIC** secara bawaan, sehingga mencabutnya dari `anon` saja tidak cukup — `anon` tetap mendapatkannya lewat PUBLIC. PUBLIC dicabut lebih dahulu, lalu diuji: `anon` dijawab *permission denied for function*.
 
 **Yang BELUM diuji, dan sebabnya:**
 

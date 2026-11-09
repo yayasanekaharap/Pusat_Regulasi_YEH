@@ -42,7 +42,11 @@
     menukar = (async () => {
       const res = await fetch(C.SUPABASE_URL.replace(/\/+$/, '') + '/functions/v1/regulasi-sesi', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: C.SUPABASE_KEY },
+        // Authorization ikut dikirim walau fungsinya memeriksa kredensialnya
+        // sendiri: dengan begitu penukaran tetap jalan bila verify_jwt pada
+        // Edge Function kelak dinyalakan.
+        headers: { 'Content-Type': 'application/json', apikey: C.SUPABASE_KEY,
+          Authorization: 'Bearer ' + C.SUPABASE_KEY },
         body: JSON.stringify({ token: sbKey }),
         cache: 'no-store', credentials: 'omit'
       });
@@ -126,7 +130,7 @@
    *  harus muncul sebagai substring. RLS tetap menyaring di sisi Postgres. */
   async function cari(q, kelompok, batas) {
     const t0 = performance.now();
-    const hasil = await rest('/rpc/cari_isi', {
+    const hasil = await rest('/rpc/reg_cari_isi', {
       method: 'POST',
       body: { p_q: String(q || ''), p_kelompok: String(kelompok || ''), p_batas: Number(batas) || 120 }
     });
