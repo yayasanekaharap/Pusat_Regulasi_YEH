@@ -10,6 +10,10 @@
  * ke sini pada tahap itu, bukan sekarang.
  */
 import React, { useEffect } from 'react';
+// Diimpor STATIS sejak v1.7.0 (K6): sebelumnya app.js dimuat sebagai bongkahan
+// kedua sesudah bongkahan pertama selesai, menambah satu perjalanan jaringan
+// berurutan pada pembukaan pertama.
+import { init } from './app.js';
 
 const LOGO = 'assets/logo.png';
 
@@ -93,8 +97,8 @@ function PanelSamping() {
         <a href="#/" data-nav="home" title="Beranda">
           <span className="ic" data-icon="home"></span><span className="lb">Beranda</span>
         </a>
-        <a href="#/penanda" data-nav="marks" title="Penanda saya">
-          <span className="ic" data-icon="star"></span><span className="lb">Penanda saya</span>
+        <a href="#/penanda" data-nav="marks" title="Tanda &amp; catatan">
+          <span className="ic" data-icon="star"></span><span className="lb">Tanda &amp; catatan</span>
           <b className="count" id="markCount"></b>
         </a>
         <a href="#/admin" data-nav="admin" id="navAdmin" title="Panel Admin" hidden>
@@ -144,9 +148,7 @@ export default function App() {
   // useEffect berjalan setelah commit, jadi urutannya terjamin — dan karena
   // StrictMode tidak dipakai, ia berjalan sekali saja.
   useEffect(() => {
-    let batal = false;
-    import('./app.js').then(m => { if (!batal) m.init(); });
-    return () => { batal = true; };
+    init();
   }, []);
 
   return (

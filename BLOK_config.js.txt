@@ -1,0 +1,13 @@
+BERKAS   : src/config.js
+CARA     : ganti DUA baris di bawah. Baris lain — terutama API_URL, SUPABASE_URL,
+           dan SUPABASE_KEY — JANGAN disentuh.
+
+1) Cari baris:
+  APP_VERSION: '1.6.0',
+   Ganti menjadi:
+  APP_VERSION: '1.7.0',
+
+2) Cari baris:
+  VERSI_BACKEND_MIN: '1.5.0',
+   Ganti menjadi:
+  VERSI_BACKEND_MIN: '1.7.0',

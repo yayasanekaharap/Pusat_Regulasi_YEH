@@ -97,14 +97,26 @@ const YehCermin = (function () {
   }
 
   /** Naskah satu regulasi, dibaca berhalaman supaya batas baris PostgREST
-   *  tidak memotong regulasi yang panjang tanpa memberi tahu. */
-  async function naskah(id) {
+   *  tidak memotong regulasi yang panjang tanpa memberi tahu.
+   *  v1.7.0 (K8): bila jumlah barisnya sudah diketahui dari daftar regulasi,
+   *  semua halaman diminta SERENTAK, bukan antre satu per satu. Jumlah itu
+   *  hanya petunjuk: halaman terakhir yang penuh tetap dilanjutkan berurutan,
+   *  jadi naskah yang bertambah panjang tidak terpotong. */
+  async function naskah(id, jumlah) {
     const t0 = performance.now();
     const rows = [];
-    for (let offset = 0; ; offset += HAL) {
-      const hal = await rest('/reg_baris?select=baris,rev,bab,pasal,ayat,poin,subpoin,t,sama' +
-        '&id_regulasi=eq.' + encodeURIComponent(id) +
-        '&order=baris.asc&limit=' + HAL + '&offset=' + offset);
+    const ambil = offset => rest('/reg_baris?select=baris,rev,bab,pasal,ayat,poin,subpoin,t,sama' +
+      '&id_regulasi=eq.' + encodeURIComponent(id) +
+      '&order=baris.asc&limit=' + HAL + '&offset=' + offset);
+    const nAwal = Math.max(1, Math.min(20, Math.ceil((Number(jumlah) || 0) / HAL)));
+    const awal = await Promise.all(Array.from({ length: nAwal }, (_, i) => ambil(i * HAL)));
+    const halaman = awal.slice();
+    let akhir = awal[awal.length - 1];
+    for (let offset = nAwal * HAL; akhir && akhir.length === HAL; offset += HAL) {
+      akhir = await ambil(offset);
+      halaman.push(akhir);
+    }
+    for (const hal of halaman) {
       if (!hal || !hal.length) break;
       hal.forEach(function (r) {
         const o = { row: r.baris, t: r.t || {} };
@@ -119,6 +131,10 @@ const YehCermin = (function () {
       });
       if (hal.length < HAL) break;
     }
+    // Satu regulasi hanya boleh dibaca dari satu revisi. Bila halaman-halaman
+    // serentak tadi kebetulan melintasi rekonsiliasi, hasilnya dibuang dan
+    // pemanggil jatuh ke jalur cadangan.
+    if (rows.length && rows.some(r => r._rev !== rows[0]._rev)) throw Error('Cermin sedang diperbarui.');
     ukur.bacaMs = Math.round(performance.now() - t0);
     ukur.baris = rows.length;
     const rev = rows.length ? rows[0]._rev : '';

@@ -1,0 +1,20 @@
+# Aturan tajuk untuk Cloudflare Workers (aset statis).
+#
+# /a/ berisi berkas hasil build yang namanya memuat kode versi (index-XXXX.js).
+# Isinya tidak pernah berubah untuk nama yang sama, jadi peramban boleh
+# menyimpannya permanen dan tidak perlu bertanya ulang ke server setiap kali
+# web dibuka.
+/a/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Service worker dan halaman utama selalu diperiksa ulang, supaya pembaruan
+# web langsung sampai ke pengguna.
+/sw.js
+  Cache-Control: no-cache
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=86400

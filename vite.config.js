@@ -12,6 +12,9 @@ export default defineConfig({
   plugins: [react({ include: /src\/.*\.jsx?$/ })],
   build: {
     outDir: 'build',
+    // Berkas berkode versi di folder tersendiri, supaya public/_headers dapat
+    // menyimpannya permanen di peramban tanpa ikut mengunci assets/logo.png.
+    assetsDir: 'a',
     sourcemap: false,
     emptyOutDir: true,
     // Polyfill modulepreload disuntikkan sebagai SKRIP INLINE, dan CSP di

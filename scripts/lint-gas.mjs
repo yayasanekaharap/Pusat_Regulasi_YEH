@@ -26,6 +26,7 @@ const DIIZINKAN_TAK_TERPAKAI = [
   'menuPasangPemicu', 'menuRekonsiliasiCermin',   // dipanggil dari menu spreadsheet
   'yehPemicuSuntingSumber', 'yehPemicuUbahSumber', 'yehPemicuSapu',
   'yehPemicuRekonsiliasi', 'yehPemicuKeepAlive',  // dipanggil pemicu
+  'revisiV170Periksa', 'revisiV170Jalankan',      // dijalankan dari editor, sekali pakai
   // Kode mati yang sudah ada sebelum v1.5.0, sengaja belum dibersihkan:
   'yehAt_', 'yehCheckSourceHeaders_', 'yehAdminMembers_', 'yehAdminSaveMember_'
 ];
