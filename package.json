@@ -1,6 +1,6 @@
 {
   "name": "pusat-regulasi-yeh",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "private": true,
   "type": "module",
   "description": "Pusat Referensi Regulasi Yayasan Eka Harap — Vite + React, diterbitkan ke Cloudflare Workers.",

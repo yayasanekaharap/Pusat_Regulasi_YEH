@@ -556,7 +556,9 @@ export function init() {
     const local = S.lib.get(id);
     if (!force && local && reg && local.rev === reg.rev) return local;
     // Saat dibuka dari salinan, kunci cermin baru ada setelah init segar tiba.
-    if (S.segar) { try { await S.segar; } catch (_) {} }
+    // Paling lama 8 detik (v1.7.1). Bila server tersangkut, naskah langsung
+    // diambil lewat Apps Script, bukan ikut menunggu sampai batas waktu.
+    if (S.segar) await Promise.race([S.segar.catch(() => {}), new Promise(r => setTimeout(r, 8000))]);
     if (reg) {
       const peta = await cerminMeta(force);
       const m = peta && peta[id];
@@ -643,7 +645,7 @@ export function init() {
       S.user.role === 'ADMIN' ? { icon: 'settings', label: 'Panel Admin', onClick: () => { location.hash = '#/admin'; } } : null,
       { icon: 'key', label: 'Ganti sandi', onClick: () => showChange(false) },
       { icon: 'refresh', label: 'Muat ulang data', onClick: () => refreshAll(true) },
-      { icon: 'activity', label: 'Diagnosa', onClick: () => { location.hash = '#/diagnosa'; } },
+      S.user.role === 'ADMIN' ? { icon: 'activity', label: 'Diagnosa', onClick: () => { location.hash = '#/admin/diagnosa'; } } : null,
       '-',
       { icon: 'logout', label: 'Keluar', danger: true, onClick: logout },
       { foot: 'Versi web ' + C.APP_VERSION + ' · data dihapus dari perangkat saat Keluar' }
@@ -745,7 +747,7 @@ export function init() {
     if (parts[0] === 'kategori' && parts[1]) return { name: 'cat', id: decodeURIComponent(parts[1]) };
     if (parts[0] === 'penanda') return { name: 'marks' };
     if (parts[0] === 'admin') return { name: 'admin', tab: parts[1] || 'users' };
-    if (parts[0] === 'diagnosa') return { name: 'diag' };
+    if (parts[0] === 'diagnosa') return { name: 'admin', tab: 'diagnosa' };
     return { name: 'home' };
   }
   async function route() {
@@ -759,7 +761,6 @@ export function init() {
     if (r.name === 'doc') await openDoc(r.id, r.row, nav, r.kepala);
     else if (r.name === 'search') await runSearch(r.q, nav);
     else if (r.name === 'admin') await showAdmin(r.tab, nav);
-    else if (r.name === 'diag') await showDiagnosa(nav);
     else if (r.name === 'cat') { renderCategory(r.id); window.scrollTo(0, 0); }
     else if (r.name === 'marks') { if (S.tanda) renderTanda(); else renderMarks(); window.scrollTo(0, 0); }
     else { renderHome(); window.scrollTo(0, 0); }
@@ -1731,9 +1732,11 @@ export function init() {
 
   /* ================= Panel Admin ================= */
   const ROLE = { ADMIN: 'Admin', USER: 'Pengguna' };
-  const TABS = [['users', 'Pengguna'], ['groups', 'Kelompok'], ['regs', 'Regulasi'], ['access', 'Izin dokumen'], ['activity', 'Aktivitas']];
+  const TABS = [['users', 'Pengguna'], ['groups', 'Kelompok'], ['regs', 'Regulasi'], ['access', 'Izin dokumen'], ['activity', 'Aktivitas'], ['diagnosa', 'Diagnosa']];
   async function showAdmin(tab, nav) {
     if (S.user.role !== 'ADMIN') { location.hash = '#/'; return; }
+    // Diagnosa hanya untuk admin (v1.7.1) dan tidak memerlukan data admin.
+    if (tab === 'diagnosa') { await showDiagnosa(nav); return; }
     if (!S.admin) {
       loading('Memuat data admin…');
       try { S.admin = await req('adminData'); } catch (e) { if (nav === S.nav) failed(e.message, () => showAdmin(tab, ++S.nav)); return; }
@@ -1742,11 +1745,12 @@ export function init() {
     renderAdmin(TABS.some(t => t[0] === tab) ? tab : 'users');
     window.scrollTo(0, 0);
   }
+  const tabAdmin = tab => h('nav', { class: 'tabs' }, TABS.map(([k, l]) => h('a', { href: '#/admin/' + k, class: k === tab ? 'on' : null }, l)));
   function renderAdmin(tab) {
     const body = tab === 'groups' ? adminGroups() : tab === 'regs' ? adminRegs() : tab === 'access' ? adminAccess() : tab === 'activity' ? adminActivity() : adminUsers();
     content().replaceChildren(h('section', { class: 'page admin' },
       pageHead('Panel Admin', 'Perubahan langsung tersimpan di spreadsheet konfigurasi.'),
-      h('nav', { class: 'tabs' }, TABS.map(([k, l]) => h('a', { href: '#/admin/' + k, class: k === tab ? 'on' : null }, l))),
+      tabAdmin(tab),
       body));
   }
   function rerenderAdmin() { const r = parseHash(); if (r.name === 'admin') renderAdmin(r.tab); }
@@ -2060,6 +2064,10 @@ export function init() {
 
   async function showDiagnosa(nav) {
     loading('Mengukur…');
+    // Kunci cermin baru ada sesudah data segar dari server tiba. Tanpa
+    // menunggu, cermin terbaca "tidak aktif" padahal hanya belum siap (v1.7.1).
+    if (S.segar) await Promise.race([S.segar.catch(() => {}), new Promise(r => setTimeout(r, 20000))]);
+    if (nav !== S.nav) return;
     const u = {};
     const t0 = performance.now();
     try {
@@ -2157,9 +2165,10 @@ export function init() {
         : h('span', { class: 'chip off', text: 'tidak terbaca' }) }
     ], namaFitur, 'Backend tidak menjawab.');
 
-    content().replaceChildren(h('section', { class: 'page' },
-      pageHead('Diagnosa', 'Angka versi saja tidak membuktikan apa pun. Baris Kemampuan backend memeriksa kode yang benar-benar terbit.',
+    content().replaceChildren(h('section', { class: 'page admin' },
+      pageHead('Panel Admin', 'Diagnosa: angka versi saja tidak membuktikan apa pun. Baris Kemampuan backend memeriksa kode yang benar-benar terbit.',
         h('button', { class: 'btn', type: 'button', onclick: () => showDiagnosa(++S.nav) }, icon('refresh'), 'Ukur ulang')),
+      tabAdmin('diagnosa'),
       tabelUkur,
       h('div', { class: 'panel' },
         // Penjelasan lantai platform SELALU ditampilkan: baris jalur cadangan

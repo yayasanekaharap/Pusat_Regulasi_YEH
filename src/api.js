@@ -30,7 +30,10 @@ const YehApi = (function () {
   async function call(action, payload, opt) {
     opt = opt || {};
     const body = JSON.stringify(Object.assign({}, payload || {}, { action: action, token: api.token || '' }));
-    const timeout = opt.timeout || (action === 'search' ? 180000 : 90000);
+    // init dibatasi 15 detik (v1.7.1): sesekali satu eksekusi Apps Script
+    // tersangkut berenit-menit; lebih baik mengulang cepat daripada menunggu
+    // 90 detik. Eksekusi yang tersangkut tidak menghalangi pengulangannya.
+    const timeout = opt.timeout || (action === 'search' ? 180000 : action === 'init' ? 15000 : 90000);
     let j;
     try { j = await once(body, timeout); }
     catch (e) {
