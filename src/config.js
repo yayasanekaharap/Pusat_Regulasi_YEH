@@ -1,9 +1,9 @@
 // Hanya pengaturan teknis. Jangan menulis sandi di berkas ini.
 export const C = {
-  APP_VERSION: '1.6.0',
+  APP_VERSION: '1.7.0',
   // Versi kode Apps Script paling tua yang masih dimengerti web ini.
   // Panel Diagnosa menyalakan hijau bila versi backend SAMA ATAU LEBIH BARU.
-  VERSI_BACKEND_MIN: '1.5.0',
+  VERSI_BACKEND_MIN: '1.7.0',
   API_URL: 'https://script.google.com/macros/s/AKfycbwB8WQ9SwTQe-A7-qbnPbP4vwZklooru5v1IC0bYqtJttAVqcMVG9rDSimzwH8NsV8/exec',
   // Cermin baca. Kunci di bawah memang kunci publik dan boleh terbaca siapa
   // pun: peran anon sudah dicabut dari seluruh tabel reg_*, sehingga tanpa JWT
